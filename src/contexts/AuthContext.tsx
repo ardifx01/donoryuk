@@ -1,0 +1,159 @@
+"use client";
+
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createClient } from "@/lib/supabase-client";
+import type { AuthContextType, Donor, Admin, SupabaseUser } from "@/types/database";
+import type { User } from "@supabase/supabase-js";
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+    const [user, setUser] = useState<SupabaseUser | null>(null);
+    const [donor, setDonor] = useState<Donor | null>(null);
+    const [admin, setAdmin] = useState<Admin | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    const supabase = createClient();
+
+    const handleUserSession = useCallback(
+        async (authUser: User) => {
+            try {
+                // Convert Supabase User to our SupabaseUser type
+                const userData: SupabaseUser = {
+                    id: authUser.id,
+                    email: authUser.email,
+                    phone: authUser.phone,
+                    created_at: authUser.created_at,
+                    updated_at: authUser.updated_at || authUser.created_at,
+                    email_confirmed_at: authUser.email_confirmed_at,
+                    phone_confirmed_at: authUser.phone_confirmed_at,
+                    last_sign_in_at: authUser.last_sign_in_at,
+                };
+
+                setUser(userData);
+
+                // Check if user is a donor
+                const { data: donorData } = await supabase.from("donors").select("*").eq("user_id", authUser.id).single();
+
+                if (donorData) {
+                    setDonor(donorData);
+                }
+
+                // Check if user is an admin
+                const { data: adminData } = await supabase.from("admins").select("*").eq("user_id", authUser.id).single();
+
+                if (adminData) {
+                    setAdmin(adminData);
+                }
+            } catch (error) {
+                console.error("Error handling user session:", error);
+            } finally {
+                setLoading(false);
+            }
+        },
+        [supabase]
+    );
+
+    useEffect(() => {
+        // Get initial session
+        const getInitialSession = async () => {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+
+            if (session?.user) {
+                await handleUserSession(session.user);
+            } else {
+                setLoading(false);
+            }
+        };
+
+        getInitialSession();
+
+        // Listen for auth changes
+        const {
+            data: { subscription },
+        } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session?.user) {
+                await handleUserSession(session.user);
+            } else {
+                setUser(null);
+                setDonor(null);
+                setAdmin(null);
+                setLoading(false);
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, [supabase.auth, handleUserSession]);
+
+    const signIn = async (email: string, password: string) => {
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if (error) {
+            throw error;
+        }
+    };
+
+    const signUp = async (email: string, password: string) => {
+        const { error } = await supabase.auth.signUp({
+            email,
+            password,
+        });
+
+        if (error) {
+            throw error;
+        }
+    };
+
+    const signOut = async () => {
+        const { error } = await supabase.auth.signOut();
+
+        if (error) {
+            throw error;
+        }
+    };
+
+    const updateProfile = async (data: Partial<Donor>) => {
+        if (!user || !donor) {
+            throw new Error("User not authenticated or not a donor");
+        }
+
+        const { error } = await supabase.from("donors").update(data).eq("id", donor.id);
+
+        if (error) {
+            throw error;
+        }
+
+        // Refresh donor data
+        const { data: updatedDonor } = await supabase.from("donors").select("*").eq("id", donor.id).single();
+
+        if (updatedDonor) {
+            setDonor(updatedDonor);
+        }
+    };
+
+    const value: AuthContextType = {
+        user,
+        donor,
+        admin,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        updateProfile,
+    };
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error("useAuth must be used within an AuthProvider");
+    }
+    return context;
+}
