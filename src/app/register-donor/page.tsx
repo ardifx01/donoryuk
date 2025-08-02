@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,13 +22,31 @@ export default function RegisterDonorPage() {
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const router = useRouter();
     const supabase = createClient();
 
-    // Redirect if not authenticated
+    // Handle authentication redirect in useEffect
+    useEffect(() => {
+        if (!authLoading && !user) {
+            router.push("/auth/login");
+        }
+    }, [user, authLoading, router]);
+
+    // Show loading while auth is being determined
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-soft flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Memuat...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Don't render the form if user is not authenticated
     if (!user) {
-        router.push("/auth/login");
         return null;
     }
 

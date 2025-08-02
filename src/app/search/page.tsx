@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-client";
+import { useAuth } from "@/contexts/AuthContext";
 import { BLOOD_TYPES, RHESUS_TYPES, INDONESIAN_CITIES } from "@/lib/constants";
 import { formatWhatsAppUrl, getBloodTypeCompatibility } from "@/lib/utils";
 import type { Donor } from "@/types/database";
@@ -12,6 +14,10 @@ export default function SearchPage() {
     const [filteredDonors, setFilteredDonors] = useState<Donor[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    const { user, signOut } = useAuth();
+    const router = useRouter();
 
     // Filter states
     const [filters, setFilters] = useState({
@@ -89,6 +95,20 @@ export default function SearchPage() {
         });
     };
 
+    const handleSignOut = async () => {
+        setIsLoggingOut(true);
+        try {
+            await signOut();
+            setTimeout(() => {
+                router.push("/");
+            }, 1000);
+        } catch (error) {
+            console.error("Error signing out:", error);
+            alert("Gagal logout. Silakan coba lagi.");
+            setIsLoggingOut(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-gradient-soft">
             {/* Header */}
@@ -103,9 +123,39 @@ export default function SearchPage() {
                         </Link>
 
                         <div className="flex items-center space-x-4">
-                            <Link href="/dashboard" className="text-gray-600 hover:text-red-500 font-medium">
-                                Dashboard
-                            </Link>
+                            {user ? (
+                                <>
+                                    <Link href="/dashboard" className="text-gray-600 hover:text-red-500 font-medium">
+                                        Dashboard
+                                    </Link>
+                                    <button
+                                        onClick={handleSignOut}
+                                        disabled={isLoggingOut}
+                                        className="bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center space-x-2"
+                                    >
+                                        {isLoggingOut ? (
+                                            <>
+                                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                <span>Keluar...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>🚪</span>
+                                                <span>Keluar</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <Link href="/auth/login" className="text-gray-600 hover:text-red-500 font-medium">
+                                        Masuk
+                                    </Link>
+                                    <Link href="/auth/register" className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
+                                        Daftar
+                                    </Link>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -275,6 +325,19 @@ export default function SearchPage() {
                     </div>
                 </div>
             </main>
+
+            {/* Logout Loading Overlay */}
+            {isLoggingOut && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Sedang Logout...</h3>
+                        <p className="text-gray-600">Mohon tunggu sebentar</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

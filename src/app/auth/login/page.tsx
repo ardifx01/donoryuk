@@ -11,8 +11,11 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showResendConfirmation, setShowResendConfirmation] = useState(false);
+    const [resendLoading, setResendLoading] = useState(false);
+    const [resendSuccess, setResendSuccess] = useState("");
 
-    const { signIn } = useAuth();
+    const { signIn, resendConfirmation } = useAuth();
     const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -24,9 +27,31 @@ export default function LoginPage() {
             await signIn(email, password);
             router.push("/dashboard");
         } catch (err: unknown) {
-            setError((err as Error).message || ERROR_MESSAGES.SERVER_ERROR);
+            const errorMessage = (err as Error).message || ERROR_MESSAGES.SERVER_ERROR;
+            setError(errorMessage);
+
+            // Show resend confirmation option if email not confirmed
+            if (errorMessage.includes("Email belum dikonfirmasi")) {
+                setShowResendConfirmation(true);
+            }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleResendConfirmation = async () => {
+        setResendLoading(true);
+        setResendSuccess("");
+        setError("");
+
+        try {
+            await resendConfirmation(email);
+            setResendSuccess("Email konfirmasi telah dikirim ulang. Silakan cek email Anda.");
+            setShowResendConfirmation(false);
+        } catch (err: unknown) {
+            setError((err as Error).message || "Gagal mengirim ulang email konfirmasi");
+        } finally {
+            setResendLoading(false);
         }
     };
 
@@ -54,6 +79,7 @@ export default function LoginPage() {
                 <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl">{error}</div>}
+                        {resendSuccess && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl">{resendSuccess}</div>}
 
                         <div>
                             <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
@@ -114,6 +140,27 @@ export default function LoginPage() {
                                 "Masuk"
                             )}
                         </button>
+
+                        {showResendConfirmation && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                                <p className="text-yellow-800 text-sm mb-3">Email Anda belum dikonfirmasi. Klik tombol di bawah untuk mengirim ulang email konfirmasi.</p>
+                                <button
+                                    type="button"
+                                    onClick={handleResendConfirmation}
+                                    disabled={resendLoading}
+                                    className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-300 text-white font-semibold py-2 px-4 rounded-xl transition-colors"
+                                >
+                                    {resendLoading ? (
+                                        <div className="flex items-center justify-center space-x-2">
+                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <span>Mengirim...</span>
+                                        </div>
+                                    ) : (
+                                        "Kirim Ulang Email Konfirmasi"
+                                    )}
+                                </button>
+                            </div>
+                        )}
                     </form>
 
                     {/* Divider */}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase-client";
 import { DONOR_STATUS_LABELS, DONOR_STATUS_COLORS } from "@/lib/constants";
@@ -19,15 +20,16 @@ export default function AdminDashboardPage() {
     const [filter, setFilter] = useState("all");
     const [searchTerm, setSearchTerm] = useState("");
 
-    const { user, admin } = useAuth();
+    const { user, admin, loading: authLoading } = useAuth();
+    const router = useRouter();
     const supabase = createClient();
 
     // Redirect if not admin
     useEffect(() => {
-        if (!loading && (!user || !admin)) {
-            window.location.href = "/auth/login";
+        if (!authLoading && (!user || !admin)) {
+            router.push("/auth/login");
         }
-    }, [user, admin, loading]);
+    }, [user, admin, authLoading, router]);
 
     useEffect(() => {
         if (user && admin) {
@@ -127,7 +129,7 @@ export default function AdminDashboardPage() {
         return colorMap[status as keyof typeof colorMap] || "bg-gray-100 text-gray-800";
     };
 
-    if (loading) {
+    if (authLoading || loading) {
         return (
             <div className="min-h-screen bg-gradient-soft flex items-center justify-center">
                 <div className="text-center">

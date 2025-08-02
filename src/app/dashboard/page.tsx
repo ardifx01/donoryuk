@@ -3,11 +3,13 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
     const { user, donor, admin, loading, signOut } = useAuth();
     const router = useRouter();
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -16,12 +18,23 @@ export default function DashboardPage() {
     }, [user, loading, router]);
 
     const handleSignOut = async () => {
+        setIsLoggingOut(true);
         try {
             await signOut();
-            router.push("/");
+            // Show success message briefly before redirect
+            setTimeout(() => {
+                router.push("/");
+            }, 1000);
         } catch (error) {
             console.error("Error signing out:", error);
+            alert("Gagal logout. Silakan coba lagi.");
+            setIsLoggingOut(false);
         }
+    };
+
+    const confirmLogout = () => {
+        setShowLogoutConfirm(false);
+        handleSignOut();
     };
 
     if (loading) {
@@ -54,8 +67,22 @@ export default function DashboardPage() {
 
                         <div className="flex items-center space-x-4">
                             <span className="text-gray-600">Halo, {user.email}</span>
-                            <button onClick={handleSignOut} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-semibold transition-colors">
-                                Keluar
+                            <button
+                                onClick={() => setShowLogoutConfirm(true)}
+                                disabled={isLoggingOut}
+                                className="bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white px-4 py-2 rounded-xl font-semibold transition-colors flex items-center space-x-2"
+                            >
+                                {isLoggingOut ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        <span>Keluar...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>🚪</span>
+                                        <span>Keluar</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>
@@ -203,6 +230,42 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </main>
+
+            {/* Logout Confirmation Modal */}
+            {showLogoutConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span className="text-red-500 text-2xl">🚪</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-800 mb-2">Konfirmasi Logout</h3>
+                            <p className="text-gray-600 mb-6">Apakah Anda yakin ingin keluar dari akun Anda?</p>
+                            <div className="flex space-x-3">
+                                <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold py-3 px-4 rounded-xl transition-colors">
+                                    Batal
+                                </button>
+                                <button onClick={confirmLogout} className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors">
+                                    Ya, Keluar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Logout Loading Overlay */}
+            {isLoggingOut && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Sedang Logout...</h3>
+                        <p className="text-gray-600">Mohon tunggu sebentar</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

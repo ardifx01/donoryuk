@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     // Protected routes for authenticated users
-    if (request.nextUrl.pathname.startsWith("/dashboard") && !user) {
+    if ((request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/register-donor")) && !user) {
         // no user, potentially respond by redirecting the user to the login page
         const url = request.nextUrl.clone();
         url.pathname = "/auth/login";

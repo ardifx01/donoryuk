@@ -32,17 +32,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 setUser(userData);
 
-                // Check if user is a donor
-                const { data: donorData } = await supabase.from("donors").select("*").eq("user_id", authUser.id).single();
+                // Reset donor and admin state first
+                setDonor(null);
+                setAdmin(null);
 
-                if (donorData) {
+                // Check if user is a donor
+                const { data: donorData, error: donorError } = await supabase.from("donors").select("*").eq("user_id", authUser.id).single();
+
+                if (donorData && !donorError) {
                     setDonor(donorData);
                 }
 
                 // Check if user is an admin
-                const { data: adminData } = await supabase.from("admins").select("*").eq("user_id", authUser.id).single();
+                const { data: adminData, error: adminError } = await supabase.from("admins").select("*").eq("user_id", authUser.id).single();
 
-                if (adminData) {
+                if (adminData && !adminError) {
                     setAdmin(adminData);
                 }
             } catch (error) {
@@ -74,12 +78,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth state change:", event, session?.user?.id);
+
             if (session?.user) {
                 await handleUserSession(session.user);
             } else {
-                setUser(null);
-                setDonor(null);
-                setAdmin(null);
+                // Only clear state if this is an actual sign out
+                if (event === "SIGNED_OUT") {
+                    setUser(null);
+                    setDonor(null);
+                    setAdmin(null);
+                }
                 setLoading(false);
             }
         });
@@ -94,7 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (error) {
-            throw error;
+            // Provide more user-friendly error messages
+            if (error.message.includes("Email not confirmed")) {
+                throw new Error("Email belum dikonfirmasi. Silakan cek email Anda dan klik link konfirmasi.");
+            } else if (error.message.includes("Invalid login credentials")) {
+                throw new Error("Email atau password salah. Silakan coba lagi.");
+            } else {
+                throw error;
+            }
         }
     };
 
@@ -102,6 +118,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.signUp({
             email,
             password,
+            options: {
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
         });
 
         if (error) {
@@ -111,6 +130,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         const { error } = await supabase.auth.signOut();
+
+        if (error) {
+            throw error;
+        }
+    };
+
+    const resendConfirmation = async (email: string) => {
+        const { error } = await supabase.auth.resend({
+            type: "signup",
+            email,
+            options: {
+                emailRedirectTo: `${window.location.origin}/auth/callback`,
+            },
+        });
 
         if (error) {
             throw error;
@@ -144,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
+        resendConfirmation,
         updateProfile,
     };
 

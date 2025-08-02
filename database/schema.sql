@@ -154,11 +154,6 @@ CREATE POLICY "Admins can update verifications" ON verifications
         )
     );
 
--- Admin policies
-CREATE POLICY "Admins can view admin records" ON admins
-    FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM admins 
-            WHERE user_id = auth.uid()
-        )
-    );
+-- Admin policies (fixed to prevent infinite recursion)
+CREATE POLICY "Users can view their own admin record" ON admins
+    FOR SELECT USING (user_id = auth.uid());
